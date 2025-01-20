@@ -1,11 +1,6 @@
-import type { Metadata } from "next";
+"use client";
 import { Provider } from "@/components/ui/provider";
 import "./globals.css";
-
-export const metadata: Metadata = {
-  title: "Graphix Web Application",
-  description: "Graphix Web Application for clients.",
-};
 
 export default function RootLayout({
   children,
