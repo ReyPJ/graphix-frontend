@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Factura</title>
+    <style>
+      body {
+        font-family: "Arial", sans-serif;
+        margin: 30px;
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      h1 {
+        font-size: 28px;
+        color: #333;
+      }
+      .details {
+        margin-bottom: 20px;
+      }
+      .details td {
+        padding: 8px;
+      }
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      .table th,
+      .table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Factura</h1>
+      <p><strong>Cliente:</strong> [Nombre del Cliente]</p>
+      <p><strong>Fecha:</strong> [Fecha]</p>
+    </div>
+
+    <div class="details">
+      <table class="table">
+        <tr>
+          <th>Descripción</th>
+          <th>Cantidad</th>
+          <th>Precio Unitario</th>
+          <th>Total</th>
+        </tr>
+        <tr>
+          <td>[Artículo 1]</td>
+          <td>[Cantidad]</td>
+          <td>[Precio]</td>
+          <td>[Total]</td>
+        </tr>
+        <tr>
+          <td>[Artículo 2]</td>
+          <td>[Cantidad]</td>
+          <td>[Precio]</td>
+          <td>[Total]</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="footer">
+      <p><strong>Total a Pagar:</strong> [Total Final]</p>
+    </div>
+  </body>
+</html>

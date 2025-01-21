@@ -66,7 +66,7 @@ const Header = () => {
             Regresar a Inicio
           </Link>
         )}
-        {pathname === "/" && isAdmin && (
+        {pathname === "/" && isAdmin || pathname === "/stages" && isAdmin && (
           <Link
             href="/admin"
             fontSize="md"

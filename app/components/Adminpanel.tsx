@@ -27,6 +27,7 @@ import { UserListInterface } from "../interfaces/UserInterface";
 import { api } from "../utils/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FaTrash } from "react-icons/fa";
+import { ClipboardIconButton, ClipboardRoot } from "@/components/ui/clipboard";
 import Cookies from "js-cookie";
 
 type Package = "basic" | "medium" | "premium";
@@ -172,8 +173,8 @@ const AdminPanel = () => {
         "/api/users/get-users/",
         {
           headers: {
-            Authorization: `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
       // Update the package names
@@ -353,6 +354,7 @@ const AdminPanel = () => {
                       <Table.ColumnHeader>Usuario</Table.ColumnHeader>
                       <Table.ColumnHeader>Contraseña</Table.ColumnHeader>
                       <Table.ColumnHeader>Paquete</Table.ColumnHeader>
+                      <Table.ColumnHeader>Copiar Datos</Table.ColumnHeader>
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
@@ -398,6 +400,13 @@ const AdminPanel = () => {
                           >
                             {user.package}
                           </Badge>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <ClipboardRoot
+                            value={`ID: ${user.id} \nNombre de usuario: ${user.username} \nContraseña: ${user.raw_password}\nPaquete: ${user.package}`}
+                          >
+                            <ClipboardIconButton />
+                          </ClipboardRoot>
                         </Table.Cell>
                       </Table.Row>
                     ))}
