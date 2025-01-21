@@ -13,6 +13,7 @@ import { useColorModeValue } from "@/components/ui/color-mode";
 import Cookies from "js-cookie";
 import { useState, useEffect } from "react";
 import { api } from "../utils/api";
+import Link from "next/link";
 
 const Landing = () => {
   const [userName, setUserName] = useState<string | null>(null);
@@ -21,19 +22,19 @@ const Landing = () => {
   useEffect(() => {
     const fetchUsername = async () => {
       try {
-        const token = Cookies.get("accessToken")
+        const token = Cookies.get("accessToken");
         const response = await api.get("api/users/get-username/", {
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
           },
         });
-        setUserName(response.data.username)
+        setUserName(response.data.username);
       } catch (error) {
-        console.log(error)
+        console.log(error);
       }
     };
     fetchUsername();
-  },[]);
+  }, []);
 
   const handleLogout = () => {
     Cookies.remove("accessToken");
@@ -155,7 +156,7 @@ const Landing = () => {
               color={"white"}
               background={"linear-gradient(to right, #3182CE, #63B3ED)"}
             >
-              ¡Empezar a crear mi cuaderno!
+              <Link href={"/stages"}>¡Empezar a crear mi cuaderno!</Link>
             </Button>
           </Box>
         </Stack>

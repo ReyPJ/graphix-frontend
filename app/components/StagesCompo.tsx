@@ -41,6 +41,9 @@ import {
   FileUploadList,
   FileUploadDropzone,
 } from "@/components/ui/file-upload";
+import Cookies from "js-cookie";
+import { api } from "../utils/api";
+import { Status } from "@/components/ui/status";
 
 const templates = [
   {
@@ -65,6 +68,7 @@ const StagesCompo: React.FC = () => {
   const [file, setFile] = useState<File[] | null>(null);
   const [acceptedOne, setAcceptedOne] = useState<boolean>(false);
   const [rejectedOne, setRejectedOne] = useState<boolean>(false);
+  const [coverImageUrl, setCoverImageUrl] = useState<string>("");
 
   const fileUpload = useFileUpload({
     maxFiles: 1,
@@ -78,7 +82,7 @@ const StagesCompo: React.FC = () => {
     if (fileUpload.acceptedFiles.length > 0) {
       setFile(fileUpload.acceptedFiles);
       setAcceptedOne(true);
-      setRejectedOne(false)
+      setRejectedOne(false);
     }
   }, [fileUpload.acceptedFiles]);
 
@@ -92,6 +96,35 @@ const StagesCompo: React.FC = () => {
   const hanldeDeleteFile = () => {
     setFile(null);
     setAcceptedOne(false);
+  };
+
+  const handleUploadFile = async () => {
+    if (!file) {
+      console.log("There is no file to send");
+    }
+
+    try {
+      const token = Cookies.get("accessToken");
+      const formData = new FormData();
+
+      if (file) {
+        formData.append("file", file[0]);
+      }
+
+      const response = await api.post(
+        "api/pdf/save/upload-cover-image/",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      setCoverImageUrl(response.data.file_url);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const page_count = 250;
@@ -108,10 +141,6 @@ const StagesCompo: React.FC = () => {
     setStageIndex((prev) => prev + 1);
     setSelectedTemplate(""); // Resetear la selección para la siguiente etapa
   };
-
-  useEffect(() => {
-    console.log(file);
-  }, [file]);
 
   useEffect(() => {
     if (selectedTemplate) {
@@ -160,41 +189,69 @@ const StagesCompo: React.FC = () => {
               ¡Bienvenido al seleccionador de plantillas!
             </Heading>
             <Stack align={"center"}>
-              <Text textAlign={"center"} py={2} fontSize={"md"}>
-                Primero, porfavor sube aqui la portada que usaras para tu
-                cuaderno de comunicados
-              </Text>
-              <FileUploadRootProvider
-                maxW={"xl"}
-                alignItems={"stretch"}
-                value={fileUpload}
-              >
-                <FileUploadDropzone
-                  label="Arrastra y agrega tus archivos para subirlos"
-                  description=".png, .jpg no mas de 5MB"
-                  borderWidth={2}
-                  borderRadius={2}
-                  borderStyle={"dashed"}
-                />
-                <FileUploadList
-                  borderWidth={1}
-                  borderRadius={2}
-                  showSize
-                  clearable
-                  onClick={hanldeDeleteFile}
-                />
-              </FileUploadRootProvider>
-              {acceptedOne && (
-                <Code colorPalette="green">
-                  Aceptado: {accepted.join(", ")}
-                </Code>
+              {!coverImageUrl && (
+                <>
+                  <Text textAlign={"center"} py={2} fontSize={"md"}>
+                    Primero, porfavor sube aqui la portada que usaras para tu
+                    cuaderno de comunicados
+                  </Text>
+                  <FileUploadRootProvider
+                    maxW={"xl"}
+                    alignItems={"stretch"}
+                    value={fileUpload}
+                  >
+                    <FileUploadDropzone
+                      label="Arrastra y agrega tus archivos para subirlos"
+                      description=".png, .jpg no mas de 5MB"
+                      borderWidth={2}
+                      borderRadius={2}
+                      borderStyle={"dashed"}
+                    />
+                    <FileUploadList
+                      borderWidth={1}
+                      borderRadius={2}
+                      showSize
+                      clearable
+                      onClick={hanldeDeleteFile}
+                    />
+                  </FileUploadRootProvider>
+                  {acceptedOne && (
+                    <Code colorPalette="green">
+                      Aceptado: {accepted.join(", ")}
+                    </Code>
+                  )}
+                  {rejectedOne && (
+                    <Code colorPalette="red">
+                      Rechazado: {rejected.join(", ")}
+                    </Code>
+                  )}
+                  {file && (
+                    <Button
+                      onClick={handleUploadFile}
+                      width="full"
+                      borderRadius={8}
+                      color={"white"}
+                      bg={{ base: "blue.600", _dark: "blue.900" }}
+                      _hover={{ bg: { base: "blue.500", _dark: "blue.800" } }}
+                    >
+                      Subir archivo
+                    </Button>
+                  )}
+                </>
               )}
-              {rejectedOne && (
-                <Code colorPalette="red">Rechazado: {rejected.join(", ")}</Code>
+              {coverImageUrl && (
+                <>
+                  <Status size={"lg"} width={"100px"} value="success">
+                    Aprobada
+                  </Status>
+                  <Alert status={"success"} size={"lg"} fontWeight={"medium"} >
+                    La imagen de portada ha sido recibida y aprobada por el servidor
+                  </Alert>
+                </>
               )}
             </Stack>
             <Text textAlign={"center"} fontSize={"md"}>
-              Ahora, selecciona o edita una plantailla para cada etapa
+              Ahora, selecciona o edita una plantilla para cada etapa
             </Text>
           </Card.Header>
           <Card.Body>
