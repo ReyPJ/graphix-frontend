@@ -8,7 +8,6 @@ import {
   Text,
   Card,
   Table,
-  HStack,
   Heading,
   Badge,
   Kbd,
@@ -29,8 +28,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FaTrash } from "react-icons/fa";
 import { ClipboardIconButton, ClipboardRoot } from "@/components/ui/clipboard";
 import Cookies from "js-cookie";
-
-type Package = "basic" | "medium" | "premium";
+import { Package, PACKAGES } from "../types/Package";
+import {
+  NumberInputField,
+  NumberInputRoot,
+} from "@/components/ui/number-input";
 
 const AdminPanel = () => {
   const [username, setUsername] = useState("");
@@ -42,6 +44,8 @@ const AdminPanel = () => {
   const [selection, setSelection] = useState<number[]>([]);
   const [deleted, setDeleted] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [pageLimit, setPageLimit] = useState<number>(50);
+  const [isCustomPackage, setIsCustomPackage] = useState<boolean>(false);
 
   const hasSelection = selection.length > 0;
   const indeterminate = hasSelection && selection.length < users.length;
@@ -60,17 +64,8 @@ const AdminPanel = () => {
           }
         );
         response.data.forEach((user) => {
-          switch (user.package) {
-            case "basic":
-              user.package = "Básico";
-              break;
-            case "medium":
-              user.package = "Intermedio";
-              break;
-            case "premium":
-              user.package = "Premium";
-              break;
-          }
+          user.package =
+            PACKAGES.find((pkg) => pkg === user.package) ?? "custom";
         });
         setUsers(response.data);
       } catch (error) {
@@ -117,6 +112,7 @@ const AdminPanel = () => {
           username,
           package: selectedPackage,
           is_temporary: true,
+          page_limit: pageLimit,
         },
         {
           headers: {
@@ -137,17 +133,7 @@ const AdminPanel = () => {
         }
       );
       response.data.forEach((user) => {
-        switch (user.package) {
-          case "basic":
-            user.package = "Básico";
-            break;
-          case "medium":
-            user.package = "Intermedio";
-            break;
-          case "premium":
-            user.package = "Premium";
-            break;
-        }
+        user.package = PACKAGES.find((pkg) => pkg === user.package) ?? "custom";
       });
       setUsers(response.data);
     } catch (error) {
@@ -179,17 +165,7 @@ const AdminPanel = () => {
       );
       // Update the package names
       response.data.forEach((user) => {
-        switch (user.package) {
-          case "basic":
-            user.package = "Básico";
-            break;
-          case "medium":
-            user.package = "Intermedio";
-            break;
-          case "premium":
-            user.package = "Premium";
-            break;
-        }
+        user.package = PACKAGES.find((pkg) => pkg === user.package) ?? "custom";
       });
       setUsers(response.data);
     } catch (error) {
@@ -234,41 +210,74 @@ const AdminPanel = () => {
                   <Box>
                     <RadioCardRoot defaultValue={"basic"}>
                       <RadioCardLabel>Paquete</RadioCardLabel>
-                      <HStack
-                        align={"stretch"}
-                        flexDir={{ base: "column", md: "row" }}
+                      <Box
+                        display={"grid"}
+                        gridTemplateColumns={{
+                          base: "repeat(2, 1fr)",
+                          md: "repeat(4, 1fr)",
+                        }}
+                        gap={4}
                       >
-                        <RadioCardItem
-                          value="basic"
-                          description="Incluye 50 páginas"
-                          onChange={(e) =>
-                            setSelectedPackage(
-                              (e.target as HTMLInputElement).value as Package
-                            )
-                          }
-                          label={"Básico"}
-                        />
-                        <RadioCardItem
-                          value="medium"
-                          description="Incluye 150 páginas"
-                          onChange={(e) =>
-                            setSelectedPackage(
-                              (e.target as HTMLInputElement).value as Package
-                            )
-                          }
-                          label={"Intermedio"}
-                        />
-                        <RadioCardItem
-                          value="premium"
-                          description="Incluye 250 páginas"
-                          onChange={(e) =>
-                            setSelectedPackage(
-                              (e.target as HTMLInputElement).value as Package
-                            )
-                          }
-                          label={"Premium"}
-                        />
-                      </HStack>
+                        {PACKAGES.map((pkg) => (
+                          <RadioCardItem
+                            key={pkg}
+                            value={pkg}
+                            borderWidth={1}
+                            borderColor={{ base: "gray.200", _dark: "white" }}
+                            description={
+                              pkg === "custom"
+                                ? "Defina manualmente la cantidad"
+                                : `Incluye ${
+                                    pkg === "basic"
+                                      ? 54
+                                      : pkg === "medium"
+                                      ? 64
+                                      : pkg === "premium"
+                                      ? 80
+                                      : pkg === "gold"
+                                      ? 90
+                                      : pkg === "platinum"
+                                      ? 100
+                                      : pkg === "diamond"
+                                      ? 150
+                                      : 200
+                                  } páginas`
+                            }
+                            onChange={(e) => {
+                              const selectedPackage = (
+                                e.target as HTMLInputElement
+                              ).value as Package;
+                              setSelectedPackage(selectedPackage);
+                              if (selectedPackage === "custom") {
+                                setIsCustomPackage(true);
+                              } else {
+                                setIsCustomPackage(false);
+                              }
+                            }}
+                            label={pkg.charAt(0).toUpperCase() + pkg.slice(1)}
+                          />
+                        ))}
+                      </Box>
+                      {isCustomPackage && (
+                        <Box mt={4} gap={2} w={"full"} textAlign={"center"}>
+                          <Heading>¿Cuantas paginas tendra el usuario?</Heading>
+                          <NumberInputRoot
+                            width={"200px"}
+                            defaultValue="1"
+                            min={1}
+                            max={250}
+                            mx={"auto"}
+                            onValueChange={(e) => setPageLimit(Number(e.value))}
+                          >
+                            <NumberInputField
+                              px={2}
+                              py={0}
+                              borderWidth={1}
+                              borderColor={"gray.200"}
+                            />
+                          </NumberInputRoot>
+                        </Box>
+                      )}
                     </RadioCardRoot>
                   </Box>
                   {!isLoading && (
@@ -391,19 +400,28 @@ const AdminPanel = () => {
                         <Table.Cell>
                           <Badge
                             colorPalette={
-                              user.package === "Básico"
+                              user.package === "basic"
                                 ? "blue"
-                                : user.package === "Intermedio"
+                                : user.package === "medium"
                                 ? "green"
-                                : "purple"
+                                : user.package === "premium"
+                                ? "purple"
+                                : user.package === "gold"
+                                ? "yellow"
+                                : user.package === "platinum"
+                                ? "cyan"
+                                : user.package === "diamond"
+                                ? "pink"
+                                : "orange"
                             }
                           >
-                            {user.package}
+                            {user.package.charAt(0).toUpperCase() +
+                              user.package.slice(1)}
                           </Badge>
                         </Table.Cell>
                         <Table.Cell>
                           <ClipboardRoot
-                            value={`ID: ${user.id} \nNombre de usuario: ${user.username} \nContraseña: ${user.raw_password}\nPaquete: ${user.package}`}
+                            value={`ID: ${user.id} \nNombre de usuario: ${user.username} \nContraseña: ${user.raw_password}\nPaquete: ${user.package}\nPaginas: ${user.page_limit}`}
                           >
                             <ClipboardIconButton />
                           </ClipboardRoot>
