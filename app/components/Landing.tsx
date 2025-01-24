@@ -23,7 +23,7 @@ const Landing = () => {
     const fetchUsername = async () => {
       try {
         const token = Cookies.get("accessToken");
-        const response = await api.get("api/users/get-username/", {
+        const response = await api.get("api/users/get-user-info/", {
           headers: {
             Authorization: `Bearer ${token}`,
           },

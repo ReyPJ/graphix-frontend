@@ -44,6 +44,13 @@ import {
 import Cookies from "js-cookie";
 import { api } from "../utils/api";
 import { Status } from "@/components/ui/status";
+import { UserListInterface } from "../interfaces/UserInterface";
+import {
+  StageSaveInterface,
+  StagedSavedGetInterface,
+} from "@/app/interfaces/UserInterface";
+import { isAxiosError } from "axios";
+import Link from "next/link";
 
 const templates = [
   {
@@ -59,24 +66,72 @@ const templates = [
 
 const StagesCompo: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
-  const [stageIndex, setStageIndex] = useState<number>(0);
-  const [errorMessage, setErrorMessage] = useState<string>(""); // Estado para mostrar el error
+  const [stageIndex, setStageIndex] = useState<number>(1);
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const [selectedTemplateContent, setSelectedTemplateContent] =
-    useState<string>(""); // Estado para el contenido de la plantilla seleccionada
-  const [open, setOpen] = useState(false); // Control de apertura del Drawer
-  const [showPreview, setShowPreview] = useState<boolean>(false); // Estado para mostrar la vista previa de la plantilla
+    useState<string>("");
+  const [open, setOpen] = useState(false);
+  const [showPreview, setShowPreview] = useState<boolean>(false);
   const [file, setFile] = useState<File[] | null>(null);
   const [acceptedOne, setAcceptedOne] = useState<boolean>(false);
   const [rejectedOne, setRejectedOne] = useState<boolean>(false);
-  const [coverImageUrl, setCoverImageUrl] = useState<string>("");
+  const [resourceImagesUrl, setResourceImagesUrl] = useState<[]>([]);
+  const [userInfo, setUserInfo] = useState<UserListInterface | null>(null);
+  const [pagesToUse, setPagesToUse] = useState<number>(1);
+  const [pagesError, setPagesError] = useState<boolean>(false);
+  const [errorSendStage, setErrorSendStage] = useState<boolean>(false);
+  const [noPages, setNoPages] = useState<boolean>(false);
 
   const fileUpload = useFileUpload({
-    maxFiles: 1,
+    maxFiles: 10,
     maxFileSize: 5000000,
   });
 
   const accepted = fileUpload.acceptedFiles.map((file) => file.name);
   const rejected = fileUpload.rejectedFiles.map((e) => e.file.name);
+
+  useEffect(() => {
+    const getStageSavedData = async () => {
+      try {
+        const token = Cookies.get("accessToken");
+        const response = await api.get<StagedSavedGetInterface>(
+          "api/pdf/save/save-stage",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setStageIndex(response.data.pdf_progress);
+      } catch (error) {
+        console.log(error);
+      }
+    };
+    getStageSavedData();
+  }, []);
+
+  useEffect(() => {
+    const fecthUserInfo = async () => {
+      try {
+        const token = Cookies.get("accessToken");
+        const response = await api.get<UserListInterface>(
+          "api/users/get-user-info/",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setUserInfo(response.data);
+        if (response.data.page_limit === 0) {
+          setNoPages(true);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fecthUserInfo();
+  }, []);
 
   useEffect(() => {
     if (fileUpload.acceptedFiles.length > 0) {
@@ -108,28 +163,35 @@ const StagesCompo: React.FC = () => {
       const formData = new FormData();
 
       if (file) {
-        formData.append("file", file[0]);
+        file.forEach((f) => formData.append("files", f));
       }
 
-      const response = await api.post(
-        "api/pdf/save/upload-cover-image/",
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-      setCoverImageUrl(response.data.file_url);
+      const response = await api.post("api/pdf/save/upload-images/", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      setResourceImagesUrl(response.data.files_url);
     } catch (error) {
       console.error(error);
     }
   };
 
-  const page_count = 250;
+  const handleNextStage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (userInfo?.page_limit && pagesToUse > userInfo.page_limit) {
+      setPagesError(true);
+      return;
+    }
 
-  const handleNextStage = () => {
+    const stageSaveData: StageSaveInterface = {
+      stage_number: stageIndex,
+      html: selectedTemplateContent,
+      page_count: pagesToUse,
+      user: userInfo?.id,
+    };
+
     if (!selectedTemplate) {
       setErrorMessage(
         "Por favor, selecciona una plantilla antes de continuar."
@@ -137,10 +199,62 @@ const StagesCompo: React.FC = () => {
       return;
     }
 
-    setErrorMessage(""); // Limpiar el mensaje de error si se selecciona una plantilla
-    setStageIndex((prev) => prev + 1);
-    setSelectedTemplate(""); // Resetear la selección para la siguiente etapa
+    try {
+      const token = Cookies.get("accessToken");
+      const response = await api.post(
+        "api/pdf/save/save-stage/",
+        stageSaveData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.status === 201) {
+        setUserInfo((prev) => {
+          if (prev) {
+            const updatedUser = {
+              ...prev,
+              page_limit: prev.page_limit - pagesToUse,
+            };
+            return updatedUser;
+          }
+          return prev;
+        });
+
+        setStageIndex((prev) => prev + 1);
+        setSelectedTemplate("");
+      }
+    } catch (error: unknown) {
+      if (isAxiosError(error) && error.response?.status === 500) {
+        setNoPages(true);
+      } else {
+        setErrorSendStage(true);
+      }
+      console.log(error);
+    }
+
+    setErrorMessage("");
   };
+
+  useEffect(() => {
+    if (errorSendStage) {
+      const timer = setTimeout(() => {
+        setErrorSendStage(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorSendStage]);
+
+  useEffect(() => {
+    if (pagesError) {
+      const timer = setTimeout(() => {
+        setPagesError(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [pagesError]);
 
   useEffect(() => {
     if (selectedTemplate) {
@@ -169,7 +283,6 @@ const StagesCompo: React.FC = () => {
 
   return (
     <Stack p={{ base: 4, md: 10 }} direction={{ base: "column", md: "row" }}>
-      {/* Form Section - Card */}
       <Flex
         p={{ base: 4, md: 8 }}
         flex={1}
@@ -189,11 +302,11 @@ const StagesCompo: React.FC = () => {
               ¡Bienvenido al seleccionador de plantillas!
             </Heading>
             <Stack align={"center"}>
-              {!coverImageUrl && (
+              {!resourceImagesUrl.length ? (
                 <>
                   <Text textAlign={"center"} py={2} fontSize={"md"}>
-                    Primero, porfavor sube aqui la portada que usaras para tu
-                    cuaderno de comunicados
+                    Primero, porfavor sube aqui las imagenes que quieras usar
+                    para la portada de tu cuaderno
                   </Text>
                   <FileUploadRootProvider
                     maxW={"xl"}
@@ -202,7 +315,7 @@ const StagesCompo: React.FC = () => {
                   >
                     <FileUploadDropzone
                       label="Arrastra y agrega tus archivos para subirlos"
-                      description=".png, .jpg no mas de 5MB"
+                      description=".png, .jpg no mas de 5MB y no mas de 10 imagenes"
                       borderWidth={2}
                       borderRadius={2}
                       borderStyle={"dashed"}
@@ -234,18 +347,23 @@ const StagesCompo: React.FC = () => {
                       bg={{ base: "blue.600", _dark: "blue.900" }}
                       _hover={{ bg: { base: "blue.500", _dark: "blue.800" } }}
                     >
-                      Subir archivo
+                      Subir archivos
                     </Button>
                   )}
                 </>
-              )}
-              {coverImageUrl && (
+              ) : (
                 <>
                   <Status size={"lg"} width={"100px"} value="success">
                     Aprobada
                   </Status>
-                  <Alert status={"success"} size={"lg"} fontWeight={"medium"} >
-                    La imagen de portada ha sido recibida y aprobada por el servidor
+                  <Alert
+                    status={"success"}
+                    size={"lg"}
+                    textAlign={"center"}
+                    fontWeight={"medium"}
+                  >
+                    Las imagenes han sido recibidas correctamente por el
+                    servidor
                   </Alert>
                 </>
               )}
@@ -262,173 +380,239 @@ const StagesCompo: React.FC = () => {
                 fontWeight={"bold"}
                 color={"blue.700"}
               >
-                Etapa {stageIndex + 1}
+                Etapa {stageIndex}
               </Text>
 
-              <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
-                <DrawerBackdrop />
-                <DrawerTrigger asChild>
-                  <Button
-                    onClick={() => setOpen(true)}
-                    width="full"
-                    borderWidth={1}
-                    _hover={{ bg: { base: "gray.100", _dark: "gray.900" } }}
-                  >
-                    Seleccionar Plantilla <CgTemplate />
-                  </Button>
-                </DrawerTrigger>
-                <Flex
-                  justify={"center"}
-                  align={"center"}
-                  direction={"column"}
-                  justifyItems={"center"}
-                  justifyContent={"center"}
-                  textAlign={"center"}
-                  alignContent={"center"}
-                  w={"100%"}
-                >
-                  <Heading py={2}>¿Cuantas Paginas?</Heading>
-                  <Field
-                    helperText="Recuerda distribuir las paginas correctamente segun tu plan contratado"
-                    w={"fit-content"}
-                    textAlign={"center"}
-                    py={2}
-                  >
-                    <NumberInputRoot
-                      width={"200px"}
-                      defaultValue="1"
-                      min={1}
-                      max={250}
-                      mx={"auto"}
-                    >
-                      <NumberInputField
-                        px={2}
-                        py={0}
+              {!noPages && (
+                <>
+                  <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
+                    <DrawerBackdrop />
+                    <DrawerTrigger asChild>
+                      <Button
+                        onClick={() => setOpen(true)}
+                        width="full"
                         borderWidth={1}
-                        borderColor={"gray.200"}
-                      />
-                    </NumberInputRoot>
-                  </Field>
+                        _hover={{ bg: { base: "gray.100", _dark: "gray.900" } }}
+                      >
+                        Seleccionar Plantilla <CgTemplate />
+                      </Button>
+                    </DrawerTrigger>
+                    <Flex
+                      justify={"center"}
+                      align={"center"}
+                      direction={"column"}
+                      justifyItems={"center"}
+                      justifyContent={"center"}
+                      textAlign={"center"}
+                      alignContent={"center"}
+                      w={"100%"}
+                    >
+                      <Heading py={2}>¿Cuantas Paginas?</Heading>
+                      <Field
+                        helperText="Recuerda distribuir las paginas correctamente segun tu plan contratado"
+                        w={"fit-content"}
+                        textAlign={"center"}
+                        py={2}
+                      >
+                        <NumberInputRoot
+                          width={"200px"}
+                          defaultValue="1"
+                          min={1}
+                          max={250}
+                          mx={"auto"}
+                          onValueChange={(e) => setPagesToUse(Number(e.value))}
+                        >
+                          <NumberInputField
+                            px={2}
+                            py={0}
+                            borderWidth={1}
+                            borderColor={"gray.200"}
+                          />
+                        </NumberInputRoot>
+                      </Field>
+                      <Alert
+                        py={3}
+                        status={"warning"}
+                        w={"1/2"}
+                        textAlign={"center"}
+                        fontSize={"lg"}
+                      >
+                        Te quedan {userInfo?.page_limit} paginas
+                      </Alert>
+                    </Flex>
+                    <DrawerContent>
+                      <DrawerHeader>
+                        <DrawerTitle>Selecciona una plantilla</DrawerTitle>
+                      </DrawerHeader>
+
+                      <DrawerBody>
+                        <RadioGroup
+                          value={selectedTemplate}
+                          onChange={(event) =>
+                            setSelectedTemplate(
+                              (event.target as HTMLInputElement).value
+                            )
+                          }
+                          variant={"subtle"}
+                        >
+                          <Stack
+                            gap={4}
+                            separator={<StackSeparator />}
+                            direction="column"
+                          >
+                            {templates.map((template) => (
+                              <Radio
+                                key={template.id}
+                                value={template.id.toString()}
+                              >
+                                {template.name}
+                              </Radio>
+                            ))}
+                          </Stack>
+                        </RadioGroup>
+                      </DrawerBody>
+
+                      <DrawerFooter justifyContent={"space-between"}>
+                        <DrawerActionTrigger asChild>
+                          <Button
+                            onClick={() => setOpen(false)}
+                            variant="outline"
+                            borderWidth={1}
+                            p={2}
+                            _hover={{
+                              bg: { base: "gray.100", _dark: "gray.900" },
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                        </DrawerActionTrigger>
+                        <Button
+                          onClick={() => setOpen(false)}
+                          variant={"outline"}
+                          borderWidth={2}
+                          p={2}
+                          _hover={{
+                            bg: { base: "gray.100", _dark: "gray.900" },
+                          }}
+                        >
+                          Seleccionar
+                        </Button>
+                      </DrawerFooter>
+                      <DrawerCloseTrigger />
+                    </DrawerContent>
+                  </DrawerRoot>
+
                   <Alert
-                    py={3}
-                    status={"warning"}
-                    w={"1/2"}
+                    my={4}
+                    status={"info"}
                     textAlign={"center"}
                     fontSize={"lg"}
                   >
-                    Te quedan {page_count} paginas
+                    Plantilla seleccionada:{" "}
+                    <Kbd>
+                      {selectedTemplate
+                        ? templates.find(
+                            (t) => t.id.toString() === selectedTemplate
+                          )?.name
+                        : "Ninguna"}
+                    </Kbd>
                   </Alert>
-                </Flex>
-                <DrawerContent>
-                  <DrawerHeader>
-                    <DrawerTitle>Selecciona una plantilla</DrawerTitle>
-                  </DrawerHeader>
 
-                  <DrawerBody>
-                    <RadioGroup
-                      value={selectedTemplate}
-                      onChange={(event) =>
-                        setSelectedTemplate(
-                          (event.target as HTMLInputElement).value
-                        )
-                      }
-                      variant={"subtle"}
-                    >
-                      <Stack
-                        gap={4}
-                        separator={<StackSeparator />}
-                        direction="column"
-                      >
-                        {templates.map((template) => (
-                          <Radio
-                            key={template.id}
-                            value={template.id.toString()}
-                          >
-                            {template.name}
-                          </Radio>
-                        ))}
-                      </Stack>
-                    </RadioGroup>
-                  </DrawerBody>
+                  {errorMessage && (
+                    <Alert status={"error"} title="Plantilla no seleccionada">
+                      {errorMessage}
+                    </Alert>
+                  )}
 
-                  <DrawerFooter justifyContent={"space-between"}>
-                    <DrawerActionTrigger asChild>
-                      <Button
-                        onClick={() => setOpen(false)}
-                        variant="outline"
-                        borderWidth={1}
-                        p={2}
-                        _hover={{ bg: { base: "gray.100", _dark: "gray.900" } }}
-                      >
-                        Cancelar
-                      </Button>
-                    </DrawerActionTrigger>
+                  <Stack gap={6} separator={<StackSeparator />}>
                     <Button
-                      onClick={() => setOpen(false)}
+                      width="full"
                       variant={"outline"}
-                      borderWidth={2}
-                      p={2}
+                      borderWidth={1}
                       _hover={{ bg: { base: "gray.100", _dark: "gray.900" } }}
+                      onClick={handleNextStage}
+                      fontSize={"lg"}
                     >
-                      Seleccionar
+                      Siguiente Etapa <FaArrowAltCircleRight />
                     </Button>
-                  </DrawerFooter>
-                  <DrawerCloseTrigger />
-                </DrawerContent>
-              </DrawerRoot>
-
-              <Alert
-                mt={4}
-                status={"info"}
-                textAlign={"center"}
-                fontSize={"lg"}
-              >
-                Plantilla seleccionada:{" "}
-                <Kbd>
-                  {selectedTemplate
-                    ? templates.find(
-                        (t) => t.id.toString() === selectedTemplate
-                      )?.name
-                    : "Ninguna"}
-                </Kbd>
-              </Alert>
-
-              {errorMessage && (
-                <Alert status={"error"} title="Plantilla no seleccionada">
-                  {errorMessage}
-                </Alert>
+                    {pagesError && (
+                      <Alert
+                        status={"error"}
+                        title="Limite de paginas excedido"
+                      >
+                        No tienes suficientes paginas disponibles
+                      </Alert>
+                    )}
+                    {errorSendStage && (
+                      <Alert status={"error"} title="Error en el servidor">
+                        No fue posible enviar la etapa, porfavor reintente.
+                      </Alert>
+                    )}
+                    ;
+                  </Stack>
+                  <Button
+                    width="full"
+                    mt={4}
+                    onClick={() => setShowPreview(!showPreview)}
+                    _hover={{ bg: { base: "gray.100", _dark: "gray.900" } }}
+                    borderWidth={1}
+                    cursor={"pointer"}
+                  >
+                    {showPreview ? (
+                      <>
+                        Cerrar Vista Previa <BiWindowClose />
+                      </>
+                    ) : (
+                      <>
+                        Ver Vista Previa <MdPreview />
+                      </>
+                    )}
+                  </Button>
+                </>
               )}
-
-              <Stack gap={6} separator={<StackSeparator />}>
-                <Button
-                  width="full"
-                  variant={"outline"}
-                  borderWidth={1}
-                  _hover={{ bg: { base: "gray.100", _dark: "gray.900" } }}
-                  onClick={handleNextStage}
-                  fontSize={"lg"}
-                >
-                  Siguiente Etapa <FaArrowAltCircleRight />
-                </Button>
-              </Stack>
-              <Button
-                width="full"
-                mt={4}
-                onClick={() => setShowPreview(!showPreview)}
-                _hover={{ bg: { base: "gray.100", _dark: "gray.900" } }}
-                borderWidth={1}
-                cursor={"pointer"}
-              >
-                {showPreview ? (
-                  <>
-                    Cerrar Vista Previa <BiWindowClose />
-                  </>
-                ) : (
-                  <>
-                    Ver Vista Previa <MdPreview />
-                  </>
-                )}
-              </Button>
+              {noPages && (
+                <>
+                  <Stack separator={<StackSeparator />} gap={4}>
+                    <Alert
+                      status={"error"}
+                      textAlign={"center"}
+                      size={"md"}
+                      fontWeight={"bold"}
+                      title={"Limite de paginas alcanzado"}
+                    >
+                      Haz alcanzado el limite de paginas permitidas por tu
+                      paquete contratado
+                      <br />
+                      Si necesitas más paginas porfavor ponte en contacto con
+                      nuestro equipo
+                    </Alert>
+                    <Alert
+                      status={"neutral"}
+                      title="Tu cuaderno esta casi listo"
+                      textAlign={"center"}
+                      fontWeight={"bold"}
+                    >
+                      Felicidades, has completado tu documento exitosamente{" "}
+                      <br />
+                      Ahora pasa a la preview y verifica que todo este bien
+                    </Alert>
+                    <Link href={"/preview"}>
+                      <Button
+                        width="full"
+                        variant={"outline"}
+                        p={6}
+                        color={"white"}
+                        bg={{ base: "blue.600", _dark: "blue.900" }}
+                        _hover={{ bg: { base: "blue.500", _dark: "blue.800" } }}
+                        fontSize={"lg"}
+                      >
+                        Pasar a la preview del documento{" "}
+                        <FaArrowAltCircleRight />
+                      </Button>
+                    </Link>
+                  </Stack>
+                </>
+              )}
             </Stack>
           </Card.Body>
         </Card.Root>
