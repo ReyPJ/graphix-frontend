@@ -677,7 +677,7 @@ const StagesCompo: React.FC = () => {
             </Heading>
             <Editor
               key={selectedTemplate}
-              apiKey="xzr7mhn6gnfqaqvg2ty1iu78glogf8q45h4m3jt7pxl13ay1"
+              apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || "no-key"}
               value={selectedTemplateContent}
               init={{
                 height: 500,
