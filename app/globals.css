@@ -5,3 +5,22 @@
 * {
   box-sizing: border-box;
 }
+
+
+.tox .tox-edit-area__iframe {
+  background-color: #fafafa !important;
+}
+
+/* Reset de estilos conflictivos */
+.tox .tox-editor-header {
+  z-index: 1000 !important;
+}
+
+/* Permitir overflow de contenido */
+.tox .tox-editor-container {
+  overflow: visible !important;
+}
+
+.tox .tox-edit-area {
+  overflow: visible !important;
+}

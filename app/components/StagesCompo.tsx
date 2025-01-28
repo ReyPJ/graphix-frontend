@@ -51,6 +51,7 @@ import {
 } from "@/app/interfaces/UserInterface";
 import { isAxiosError } from "axios";
 import Link from "next/link";
+import { Editor } from "@tinymce/tinymce-react";
 
 const templates = [
   {
@@ -70,6 +71,7 @@ const StagesCompo: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [selectedTemplateContent, setSelectedTemplateContent] =
     useState<string>("");
+  const [currentTemplateCSS, setCurrentTemplateCSS] = useState<string>("");
   const [open, setOpen] = useState(false);
   const [showPreview, setShowPreview] = useState<boolean>(false);
   const [file, setFile] = useState<File[] | null>(null);
@@ -132,6 +134,10 @@ const StagesCompo: React.FC = () => {
     };
     fecthUserInfo();
   }, []);
+
+  const handleEditorChange = (content: string) => {
+    setSelectedTemplateContent(content);
+  };
 
   useEffect(() => {
     if (fileUpload.acceptedFiles.length > 0) {
@@ -256,20 +262,60 @@ const StagesCompo: React.FC = () => {
     }
   }, [pagesError]);
 
+  // useEffect(() => {
+  //   if (selectedTemplate) {
+  //     const template = templates.find(
+  //       (template) => template.id.toString() === selectedTemplate
+  //     );
+  //     if (template) {
+  //       fetch(template.content)
+  //         .then((response) => response.text())
+  //         .then((data) => {
+  //           setSelectedTemplateContent(data);
+  //           setOpen(false);
+  //           setTimeout(() => setOpen(true), 100);
+  //         })
+  //         .catch(() =>
+  //           setSelectedTemplateContent("Error al cargar la plantilla.")
+  //         );
+  //     }
+  //   }
+  // }, [selectedTemplate]);
+
   useEffect(() => {
-    if (selectedTemplate) {
-      const template = templates.find(
-        (template) => template.id.toString() === selectedTemplate
-      );
-      if (template) {
-        fetch(template.content)
-          .then((response) => response.text())
-          .then((data) => setSelectedTemplateContent(data))
-          .catch(() =>
-            setSelectedTemplateContent("Error al cargar la plantilla.")
-          );
+    const loadTemplate = async () => {
+      if (selectedTemplate) {
+        const template = templates.find(
+          (t) => t.id.toString() === selectedTemplate
+        );
+
+        if (template) {
+          try {
+            const response = await fetch(template.content);
+            const html = await response.text();
+
+            // Extraer el CSS específico de esta plantilla
+            const styleTag = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+            const templateCSS = styleTag ? styleTag[1] : "";
+
+            // Remover la etiqueta style del HTML
+            const cleanedHTML = html.replace(
+              /<style[^>]*>[\s\S]*?<\/style>/gi,
+              ""
+            );
+
+            // Actualizar estados
+            setSelectedTemplateContent(cleanedHTML);
+            setCurrentTemplateCSS(templateCSS);
+          } catch (error) {
+            console.error(error);
+            setSelectedTemplateContent("Error al cargar la plantilla.");
+          }
+        }
       }
-    }
+    };
+
+    loadTemplate();
   }, [selectedTemplate]);
 
   useEffect(() => {
@@ -627,12 +673,58 @@ const StagesCompo: React.FC = () => {
             mt={8}
           >
             <Heading fontSize="xl" textAlign={"center"} mb={4}>
-              Vista Previa de la Plantilla
+              Editar Plantilla
             </Heading>
-            <div
-              dangerouslySetInnerHTML={{
-                __html: selectedTemplateContent,
+            <Editor
+              key={selectedTemplate}
+              apiKey="xzr7mhn6gnfqaqvg2ty1iu78glogf8q45h4m3jt7pxl13ay1"
+              value={selectedTemplateContent}
+              init={{
+                height: 500,
+                menubar: true,
+                plugins: [
+                  "advlist",
+                  "autolink",
+                  "lists",
+                  "link",
+                  "charmap",
+                  "preview",
+                  "anchor",
+                  "searchreplace",
+                  "visualblocks",
+                  "code",
+                  "fullscreen",
+                  "insertdatetime",
+                  "table",
+                  "code",
+                  "help",
+                  "wordcount",
+                  "emoticons",
+                ],
+                toolbar:
+                  "undo redo | blocks | " +
+                  "bold italic forecolor | alignleft aligncenter " +
+                  "alignright alignjustify | bullist numlist outdent indent | " +
+                  "removeformat | help | image | code",
+                content_style: `
+                  body { 
+                    margin: 0 !important; 
+                    padding: 0 !important;
+                  }
+                  ${currentTemplateCSS}
+                `,
+                valid_elements: "*[*]",
+                valid_styles: {
+                  "*": "color,font-size,font-weight,font-style,text-decoration,float,margin,padding",
+                },
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                setup: (editor: any) => {
+                  editor.on("init", () => {
+                    editor.dom.addStyle(currentTemplateCSS);
+                  });
+                },
               }}
+              onEditorChange={handleEditorChange}
             />
           </Box>
         )}
