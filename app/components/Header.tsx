@@ -52,7 +52,7 @@ const Header = () => {
         />
 
         <ColorModeButton />
-        {pathname === "/admin" || pathname === "/stages" && (
+        {(pathname === "/admin" || pathname === "/stages") && (
           <Link
             href="/"
             fontSize="md"

@@ -71,7 +71,6 @@ const StagesCompo: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [selectedTemplateContent, setSelectedTemplateContent] =
     useState<string>("");
-  const [currentTemplateCSS, setCurrentTemplateCSS] = useState<string>("");
   const [open, setOpen] = useState(false);
   const [showPreview, setShowPreview] = useState<boolean>(false);
   const [file, setFile] = useState<File[] | null>(null);
@@ -231,6 +230,8 @@ const StagesCompo: React.FC = () => {
 
         setStageIndex((prev) => prev + 1);
         setSelectedTemplate("");
+        setShowPreview(false);
+        setPagesToUse(0)
       }
     } catch (error: unknown) {
       if (isAxiosError(error) && error.response?.status === 500) {
@@ -262,26 +263,6 @@ const StagesCompo: React.FC = () => {
     }
   }, [pagesError]);
 
-  // useEffect(() => {
-  //   if (selectedTemplate) {
-  //     const template = templates.find(
-  //       (template) => template.id.toString() === selectedTemplate
-  //     );
-  //     if (template) {
-  //       fetch(template.content)
-  //         .then((response) => response.text())
-  //         .then((data) => {
-  //           setSelectedTemplateContent(data);
-  //           setOpen(false);
-  //           setTimeout(() => setOpen(true), 100);
-  //         })
-  //         .catch(() =>
-  //           setSelectedTemplateContent("Error al cargar la plantilla.")
-  //         );
-  //     }
-  //   }
-  // }, [selectedTemplate]);
-
   useEffect(() => {
     const loadTemplate = async () => {
       if (selectedTemplate) {
@@ -294,19 +275,7 @@ const StagesCompo: React.FC = () => {
             const response = await fetch(template.content);
             const html = await response.text();
 
-            // Extraer el CSS específico de esta plantilla
-            const styleTag = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-            const templateCSS = styleTag ? styleTag[1] : "";
-
-            // Remover la etiqueta style del HTML
-            const cleanedHTML = html.replace(
-              /<style[^>]*>[\s\S]*?<\/style>/gi,
-              ""
-            );
-
-            // Actualizar estados
-            setSelectedTemplateContent(cleanedHTML);
-            setCurrentTemplateCSS(templateCSS);
+            setSelectedTemplateContent(html);
           } catch (error) {
             console.error(error);
             setSelectedTemplateContent("Error al cargar la plantilla.");
@@ -338,7 +307,7 @@ const StagesCompo: React.FC = () => {
         justify={"center"}
       >
         <Card.Root
-          w={{ base: "full", md: "60%" }}
+          w={{ base: "full", md: "70%" }}
           h={"auto"}
           boxShadow="lg"
           borderRadius="lg"
@@ -711,16 +680,28 @@ const StagesCompo: React.FC = () => {
                     margin: 0 !important; 
                     padding: 0 !important;
                   }
-                  ${currentTemplateCSS}
                 `,
                 valid_elements: "*[*]",
                 valid_styles: {
-                  "*": "color,font-size,font-weight,font-style,text-decoration,float,margin,padding",
+                  "*":
+                    "color,font-size,font-weight,font-style,text-decoration," +
+                    "float,margin,padding,width,height,display,border," +
+                    "border-collapse,border-spacing,border-color,border-width," +
+                    "text-align,vertical-align,background,background-color",
                 },
+                allow_unsafe_link_target: true,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setup: (editor: any) => {
                   editor.on("init", () => {
-                    editor.dom.addStyle(currentTemplateCSS);
+                    editor.serializer.addAttributeFilter(
+                      "style",
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      (nodes: any[]) => {
+                        nodes.forEach((node) => {
+                          node.attr("style", node.attr("style"));
+                        });
+                      }
+                    );
                   });
                 },
               }}

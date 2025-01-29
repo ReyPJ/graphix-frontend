@@ -8,7 +8,7 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    const verifyResponse = await fetch("http://localhost:8000/token/verify/", {
+    const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_DJANGO_BACKEND_URL}token/verify/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
