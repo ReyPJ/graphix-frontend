@@ -107,7 +107,7 @@ const PreviewsPage = () => {
         }
       );
       if (response.data) {
-        window.location.href = "/";
+        window.location.href = "/login";
       }
     } catch (error) {
       console.error(error);

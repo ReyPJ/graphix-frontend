@@ -124,15 +124,20 @@ const StagesCompo: React.FC = () => {
           }
         );
         setUserInfo(response.data);
-        if (response.data.page_limit === 0) {
-          setNoPages(true);
-        }
       } catch (error) {
         console.error(error);
       }
     };
     fecthUserInfo();
   }, []);
+
+  useEffect(() => {
+    if (userInfo?.page_limit === 0) {
+      setNoPages(true);
+    } else {
+      setNoPages(false);
+    }
+  }, [userInfo]);
 
   const handleEditorChange = (content: string) => {
     setSelectedTemplateContent(content);
@@ -231,7 +236,7 @@ const StagesCompo: React.FC = () => {
         setStageIndex((prev) => prev + 1);
         setSelectedTemplate("");
         setShowPreview(false);
-        setPagesToUse(0)
+        setPagesToUse(0);
       }
     } catch (error: unknown) {
       if (isAxiosError(error) && error.response?.status === 500) {
