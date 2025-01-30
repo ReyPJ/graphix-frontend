@@ -17,12 +17,13 @@ import { Field } from "@/components/ui/field";
 import { useState } from "react";
 import { api } from "../utils/api";
 import Cookies from "js-cookie";
-import {jwtDecode} from "jwt-decode"
+import { jwtDecode } from "jwt-decode";
 
 export default function SplitScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loginIn, setLoginIn] = useState<boolean>(false);
 
   const handleLogin = async () => {
     try {
@@ -30,6 +31,7 @@ export default function SplitScreen() {
         username,
         password,
       });
+      setLoginIn(true);
       const access = response.data.access;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const decodeToken: any = jwtDecode(access);
@@ -101,7 +103,7 @@ export default function SplitScreen() {
                   _hover={{ bg: { base: "gray.100", _dark: "gray.900" } }}
                   onClick={handleLogin}
                 >
-                  Iniciar Sesion
+                  {loginIn ? "Cargando..." : "Iniciar Sesion"}
                 </Button>
                 {error && <Alert status="error">{error}</Alert>}
               </Stack>
