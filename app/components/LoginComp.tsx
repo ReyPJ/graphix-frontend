@@ -40,8 +40,7 @@ export default function SplitScreen() {
       Cookies.set("user_id", userId, { expires: 1 });
       Cookies.set("accessToken", access, { expires: 1 });
       window.location.href = "/";
-    } catch (error) {
-      console.error(error);
+    } catch {
       setError("Usuario o contraseña incorrectos");
     }
   };
